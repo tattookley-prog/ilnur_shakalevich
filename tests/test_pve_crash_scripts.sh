@@ -107,6 +107,58 @@ for script in "${WITH_REBOOT}" "${NO_REBOOT}"; do
     fi
 done
 
+# --- Дополнительные тесты (только при наличии passwordless sudo) --------
+# Эти тесты запускают скрипты от root через sudo, чтобы проверить полный
+# путь --dry-run (вывод цели) и путь --execute с ЗАВЕДОМО НЕВЕРНОЙ фразой
+# подтверждения (что гарантированно останавливает скрипт ДО записи в
+# /proc и ДО вызова паники ядра). Реальная паника ядра НИКОГДА не
+# вызывается этими тестами.
+if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    FAKE_PVEVERSION=/usr/sbin/pveversion
+    if [[ -e "${FAKE_PVEVERSION}" ]]; then
+        echo "SKIP: расширенные тесты через sudo пропущены (pveversion уже существует в системе)"
+    else
+        cleanup_fake_pveversion() {
+            sudo rm -f "${FAKE_PVEVERSION}"
+        }
+        trap cleanup_fake_pveversion EXIT
+
+        sudo tee "${FAKE_PVEVERSION}" >/dev/null <<'EOF'
+#!/bin/bash
+echo "pve-manager/8.0.3/test (running kernel: 6.2.16-3-pve)"
+EOF
+        sudo chmod +x "${FAKE_PVEVERSION}"
+
+        for script in "${WITH_REBOOT}" "${NO_REBOOT}"; do
+            name="$(basename "${script}")"
+
+            # --dry-run как root: должен вывести полную информацию о цели
+            # и завершиться с кодом 0, ничего не изменяя.
+            set +e
+            out="$(sudo "${script}" --dry-run 2>&1)"
+            code=$?
+            set -e
+            assert_exit_code 0 "${code}" "${name}: --dry-run от root завершается успешно"
+            assert_contains "${out}" "Режим --dry-run" "${name}: --dry-run от root печатает сообщение о выходе без изменений"
+            assert_contains "${out}" "Резервная копия данных НЕ создаётся" "${name}: --dry-run от root печатает предупреждение об отсутствии резервной копии"
+
+            # --execute при неинтерактивном stdin (пайп): должен остановиться
+            # ДО запроса подтверждения, ДО записи в /proc и ДО паники ядра.
+            set +e
+            out="$(echo "неверная фраза" | sudo "${script}" --execute 2>&1)"
+            code=$?
+            set -e
+            assert_exit_code 1 "${code}" "${name}: --execute с неинтерактивным stdin отклоняется"
+            assert_contains "${out}" "интерактивного stdin" "${name}: --execute сообщает о требовании интерактивного stdin"
+        done
+
+        trap - EXIT
+        cleanup_fake_pveversion
+    fi
+else
+    echo "SKIP: расширенные тесты через sudo пропущены (root или passwordless sudo недоступны)"
+fi
+
 echo
 if [[ "${FAILURES}" -ne 0 ]]; then
     echo "ИТОГ: ${FAILURES} тест(ов) провалено."

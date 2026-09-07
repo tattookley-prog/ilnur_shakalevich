@@ -97,11 +97,7 @@ if systemd-detect-virt --container --quiet; then
     die "обнаружен контейнер (LXC/OpenVZ) -- скрипт предназначен только для ВМ."
 fi
 
-if VIRT_TYPE="$(systemd-detect-virt --vm)"; then
-    :
-else
-    die "виртуализация ВМ не обнаружена (systemd-detect-virt --vm). Отказ."
-fi
+VIRT_TYPE="$(systemd-detect-virt --vm)" || die "виртуализация ВМ не обнаружена (systemd-detect-virt --vm). Отказ."
 
 # --- Проверка возможности записи в интерфейсы ядра ----------------------
 # Эти проверки лишь подтверждают доступность файлов для записи, они также

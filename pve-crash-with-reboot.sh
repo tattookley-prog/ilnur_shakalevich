@@ -179,8 +179,14 @@ fi
 echo "Подтверждение получено. Через 5 секунд будет вызвана паника ядра с попыткой автоматической перезагрузки через ${PANIC_REBOOT_TIMEOUT_SEC} секунд после паники..."
 sleep 5
 
-# Устанавливаем таймаут автоматической перезагрузки после паники ядра.
+# Устанавливаем таймаут автоматической перезагрузки после паники ядра и
+# проверяем, что значение действительно применилось.
 echo "${PANIC_REBOOT_TIMEOUT_SEC}" > "${KERNEL_PANIC}"
+ACTUAL_PANIC_VALUE="$(cat "${KERNEL_PANIC}")"
+if [[ "${ACTUAL_PANIC_VALUE}" != "${PANIC_REBOOT_TIMEOUT_SEC}" ]]; then
+    die "не удалось установить ${KERNEL_PANIC}=${PANIC_REBOOT_TIMEOUT_SEC} (текущее значение: ${ACTUAL_PANIC_VALUE}). Отмена без вызова паники."
+fi
+echo "Установлено ${KERNEL_PANIC}=${ACTUAL_PANIC_VALUE} (подтверждено чтением)."
 
 # Включаем sysrq (на случай, если он ограничен) и вызываем панику ядра.
 echo 1 > "${SYSRQ_ENABLE}"

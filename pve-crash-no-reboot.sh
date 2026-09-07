@@ -86,12 +86,10 @@ if systemd-detect-virt --container --quiet; then
     die "обнаружен контейнер (LXC/OpenVZ) -- скрипт предназначен только для ВМ."
 fi
 
-if ! systemd-detect-virt --vm --quiet; then
+if VIRT_TYPE="$(systemd-detect-virt --vm)"; then
+    :
+else
     die "виртуализация ВМ не обнаружена (systemd-detect-virt --vm). Отказ."
-fi
-
-if ! VIRT_TYPE="$(systemd-detect-virt)"; then
-    VIRT_TYPE="неизвестно (systemd-detect-virt завершился с ошибкой, хотя --vm обнаружение прошло успешно)"
 fi
 
 # --- Проверка возможности записи в интерфейсы ядра ----------------------
@@ -176,6 +174,9 @@ fi
 echo "Установлено ${KERNEL_PANIC}=${ACTUAL_PANIC_VALUE} (подтверждено чтением)."
 
 # Включаем sysrq (на случай, если он ограничен) и вызываем панику ядра.
+# Примечание: этот блок намеренно дублируется в pve-crash-with-reboot.sh,
+# так как оба скрипта по требованию должны быть самодостаточными
+# (self-contained) и не использовать общую библиотеку.
 echo 1 > "${SYSRQ_ENABLE}"
 echo c > "${SYSRQ_TRIGGER}"
 

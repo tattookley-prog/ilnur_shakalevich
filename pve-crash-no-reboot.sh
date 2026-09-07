@@ -90,7 +90,9 @@ if ! systemd-detect-virt --vm --quiet; then
     die "виртуализация ВМ не обнаружена (systemd-detect-virt --vm). Отказ."
 fi
 
-VIRT_TYPE="$(systemd-detect-virt || true)"
+if ! VIRT_TYPE="$(systemd-detect-virt)"; then
+    VIRT_TYPE="неизвестно (systemd-detect-virt завершился с ошибкой, хотя --vm обнаружение прошло успешно)"
+fi
 
 # --- Проверка возможности записи в интерфейсы ядра ----------------------
 # Эти проверки лишь подтверждают доступность файлов для записи, они также
